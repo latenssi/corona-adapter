@@ -1,0 +1,32 @@
+{
+  "name": "corona-adapter",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon ./server.js",
+    "start": "node ./server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/latenssi/corona-adapter.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/latenssi/corona-adapter/issues"
+  },
+  "homepage": "https://github.com/latenssi/corona-adapter#readme",
+  "dependencies": {
+    "@koa/cors": "^3.0.0",
+    "axios": "^0.19.2",
+    "json2csv": "^5.0.0",
+    "koa": "^2.11.0",
+    "koa-router": "^8.0.8",
+    "streaming-cache": "^0.5.5"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.2"
+  }
+}
