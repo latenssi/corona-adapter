@@ -50,7 +50,7 @@ function streamData(ctx, path, type) {
   chain.on("data", () => {});
   chain.on("end", () => {});
 
-  ctx.type = "json";
+  ctx.type = type;
   ctx.body = chain.output;
 }
 
