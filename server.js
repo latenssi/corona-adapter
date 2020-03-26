@@ -54,7 +54,7 @@ function streamData(ctx, path, type) {
   ctx.body = chain.output;
 }
 
-router.get("/:path.:type", ctx => {
+router.get("/FI/:path.:type", ctx => {
   const { path, type } = ctx.params;
   if (
     ["confirmed", "recovered", "deaths"].indexOf(path) > -1 &&
