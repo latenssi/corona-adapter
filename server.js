@@ -8,17 +8,16 @@ const { pick: streamJsonPicker } = require("stream-json/filters/Pick");
 const { stringer: streamJsonStringer } = require("stream-json/Stringer");
 const { Transform: CSVTransform } = require("json2csv");
 
-const axios = require("axios");
+const request = require("request");
 const fs = require("fs");
 
 function attachDataStream(stream) {
   // fs.createReadStream("./temp.json").pipe(stream);
-  axios({
-    method: "get",
-    url:
-      "https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData",
-    responseType: "stream"
-  }).then(response => response.data.pipe(stream));
+  request
+    .get(
+      "https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData"
+    )
+    .pipe(stream);
 }
 
 function streamData(ctx, path, type) {
