@@ -1,4 +1,4 @@
-const fs = require("fs");
+// const fs = require("fs");
 
 const KoaCors = require("@koa/cors");
 const router = require("koa-router")();
@@ -11,30 +11,51 @@ const { stringer: StreamJsonStringer } = require("stream-json/Stringer");
 const { Transform: CSVTransform } = require("json2csv");
 
 const request = require("request");
-const dateFormat = require("dateformat");
+// const dateFormat = require("dateformat");
+// const redis = require("redis");
+// require("redis-streams")(redis);
+
+// const redisClient = redis.createClient(process.env.REDIS_URL);
 
 const dataURI =
   "https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData";
 
-function getCacheFilename() {
-  return `./cache/data-${dateFormat(new Date(), "yyyy-mm-dd-hh")}.dat`;
+function getCacheName() {
+  return `data-${dateFormat(new Date(), "yyyy-mm-dd-hh")}`;
+}
+
+function getCacheFilepath() {
+  return `./cache/${getCacheName()}.dat`;
 }
 
 function getDataStream() {
-  const filename = getCacheFilename();
-  const fileExist = fs.existsSync(filename);
+  // const cacheKey = "test-";
+  // const filename = getCacheFilepath();
+  // const fileExist = fs.existsSync(filename);
 
-  return new Promise(resolve => {
-    if (fileExist) {
-      resolve(fs.createReadStream(filename, { encoding: "utf8" }));
-    } else {
-      request
-        .get(dataURI)
-        .pipe(fs.createWriteStream(filename, { encoding: "utf8" }))
-        .on("finish", () =>
-          resolve(fs.createReadStream(filename, { encoding: "utf8" }))
-        );
-    }
+  return new Promise((resolve, reject) => {
+    resolve(request.get(dataURI));
+    // redisClient.exists(cacheKey, (err, exists) => {
+    //   if (err) reject(err);
+    //   if (exists) {
+    //     resolve(redisClient.readStream(cacheKey));
+    //   } else {
+    //     resolve(
+    //       request.get(dataURI).pipe(redisClient.writeThrough(cacheKey, 60))
+    //     );
+    //   }
+    // });
+
+    // if (fileExist) {
+    //   resolve(fs.createReadStream(filename, { encoding: "utf8" }));
+    // } else {
+    //   request
+    //     .get(dataURI)
+    //     .pipe(fs.createWriteStream(filename, { encoding: "utf8" }))
+    //     .on("finish", () =>
+    //       resolve(fs.createReadStream(filename, { encoding: "utf8" }))
+    //     );
+    // }
   });
 }
 
