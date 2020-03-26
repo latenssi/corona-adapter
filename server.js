@@ -1,30 +1,46 @@
+const fs = require("fs");
+
 const KoaCors = require("@koa/cors");
 const router = require("koa-router")();
 const server = new (require("koa"))();
 
 const Chain = require("stream-chain");
-const { parser: streamJsonParser } = require("stream-json");
-const { pick: streamJsonPicker } = require("stream-json/filters/Pick");
-const { stringer: streamJsonStringer } = require("stream-json/Stringer");
+const { parser: StreamJsonParser } = require("stream-json");
+const { pick: StreamJsonPicker } = require("stream-json/filters/Pick");
+const { stringer: StreamJsonStringer } = require("stream-json/Stringer");
 const { Transform: CSVTransform } = require("json2csv");
 
 const request = require("request");
-const fs = require("fs");
+const dateFormat = require("dateformat");
 
-function attachDataStream(stream) {
-  // fs.createReadStream("./temp.json").pipe(stream);
-  request
-    .get(
-      "https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData"
-    )
-    .pipe(stream);
+const dataURI =
+  "https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData";
+
+function getCacheFilename() {
+  return `./cache/data-${dateFormat(new Date(), "yyyy-mm-dd-hh")}.dat`;
 }
 
-function streamData(ctx, path, type) {
+function getDataStream() {
+  const filename = getCacheFilename();
+  const fileExist = fs.existsSync(filename);
+
+  return new Promise(resolve => {
+    if (fileExist) {
+      resolve(fs.createReadStream(filename));
+    } else {
+      request
+        .get(dataURI)
+        .pipe(fs.createWriteStream(filename))
+        .on("finish", () => resolve(fs.createReadStream(filename)));
+    }
+  });
+}
+
+async function streamData(ctx, path, type) {
   const pipeline = [
-    streamJsonParser(), // Parse json byte stream
-    streamJsonPicker({ filter: path }), // Pick the parts we want
-    streamJsonStringer() // Convert back to byte stream
+    StreamJsonParser(), // Parse json byte stream
+    StreamJsonPicker({ filter: path }), // Pick the parts we want
+    StreamJsonStringer() // Convert back to byte stream
   ];
 
   if (type === "csv") {
@@ -43,23 +59,21 @@ function streamData(ctx, path, type) {
 
   const chain = new Chain(pipeline);
 
-  attachDataStream(chain.input);
+  const dataStream = await getDataStream();
 
-  // WTF? removing these causes the stream to never end..
-  chain.on("data", () => {});
-  chain.on("end", () => {});
+  dataStream.pipe(chain.input);
 
   ctx.type = type;
-  ctx.body = chain.output;
+  ctx.body = chain;
 }
 
-router.get("/FI/:path.:type", ctx => {
+router.get("/FI/:path.:type", async ctx => {
   const { path, type } = ctx.params;
   if (
     ["confirmed", "recovered", "deaths"].indexOf(path) > -1 &&
     ["json", "csv"].indexOf(type) > -1
   ) {
-    streamData(ctx, path, type);
+    await streamData(ctx, path, type);
     return;
   }
   ctx.status = 404;
