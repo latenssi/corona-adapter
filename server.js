@@ -26,12 +26,14 @@ function getDataStream() {
 
   return new Promise(resolve => {
     if (fileExist) {
-      resolve(fs.createReadStream(filename));
+      resolve(fs.createReadStream(filename, { encoding: "utf8" }));
     } else {
       request
         .get(dataURI)
-        .pipe(fs.createWriteStream(filename))
-        .on("finish", () => resolve(fs.createReadStream(filename)));
+        .pipe(fs.createWriteStream(filename, { encoding: "utf8" }))
+        .on("finish", () =>
+          resolve(fs.createReadStream(filename, { encoding: "utf8" }))
+        );
     }
   });
 }
@@ -45,15 +47,19 @@ async function streamData(ctx, path, type) {
 
   if (type === "csv") {
     pipeline.push(
-      new CSVTransform({
-        fields: [
-          "id",
-          "date",
-          "healthCareDistrict",
-          "infectionSourceCountry",
-          "infectionSource"
-        ]
-      })
+      new CSVTransform(
+        {
+          fields: [
+            "id",
+            "date",
+            "healthCareDistrict",
+            "infectionSourceCountry",
+            "infectionSource"
+          ],
+          withBOM: true
+        },
+        { encoding: "utf-8" }
+      )
     );
   }
 
