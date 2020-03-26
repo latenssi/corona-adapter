@@ -1,4 +1,4 @@
-// const fs = require("fs");
+const fs = require("fs");
 
 const KoaCors = require("@koa/cors");
 const router = require("koa-router")();
@@ -11,52 +11,30 @@ const { stringer: StreamJsonStringer } = require("stream-json/Stringer");
 const { Transform: CSVTransform } = require("json2csv");
 
 const request = require("request");
-// const dateFormat = require("dateformat");
-// const redis = require("redis");
-// require("redis-streams")(redis);
-
-// const redisClient = redis.createClient(process.env.REDIS_URL);
+const dateFormat = require("dateformat");
 
 const dataURI =
   "https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData";
 
-function getCacheName() {
-  return `data-${dateFormat(new Date(), "yyyy-mm-dd-hh")}`;
-}
-
 function getCacheFilepath() {
-  return `./cache/${getCacheName()}.dat`;
+  return `./cache/data-${dateFormat(new Date(), "yyyy-mm-dd-hh")}.dat`;
 }
 
-function getDataStream() {
-  // const cacheKey = "test-";
-  // const filename = getCacheFilepath();
-  // const fileExist = fs.existsSync(filename);
+async function getDataStream() {
+  if (!process.env.USE_CACHE) return request.get(dataURI);
 
-  return new Promise((resolve, reject) => {
-    resolve(request.get(dataURI));
-    // redisClient.exists(cacheKey, (err, exists) => {
-    //   if (err) reject(err);
-    //   if (exists) {
-    //     resolve(redisClient.readStream(cacheKey));
-    //   } else {
-    //     resolve(
-    //       request.get(dataURI).pipe(redisClient.writeThrough(cacheKey, 60))
-    //     );
-    //   }
-    // });
+  const filename = getCacheFilepath();
 
-    // if (fileExist) {
-    //   resolve(fs.createReadStream(filename, { encoding: "utf8" }));
-    // } else {
-    //   request
-    //     .get(dataURI)
-    //     .pipe(fs.createWriteStream(filename, { encoding: "utf8" }))
-    //     .on("finish", () =>
-    //       resolve(fs.createReadStream(filename, { encoding: "utf8" }))
-    //     );
-    // }
-  });
+  if (!fs.existsSync(filename)) {
+    await new Promise(resolve =>
+      request
+        .get(dataURI)
+        .pipe(fs.createWriteStream(filename))
+        .on("finish", resolve)
+    );
+  }
+
+  return fs.createReadStream(filename);
 }
 
 async function streamData(ctx, path, type) {
