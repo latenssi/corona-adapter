@@ -16,7 +16,7 @@ const dataURI =
   "https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData";
 
 const getCacheFilepath = () => {
-  return `./cache/data-${dateFormat(new Date(), "yyyy-mm-dd-hh")}.dat`;
+  return `./cache/data-${dateFormat(new Date(), "yyyy-mm-dd-HH")}.dat`;
 };
 
 const csvOptions = [{ withBOM: true }, { encoding: "utf-8" }];
