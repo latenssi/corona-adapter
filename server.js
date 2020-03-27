@@ -2,34 +2,61 @@ const server = new (require("koa"))();
 const router = require("koa-router")();
 const cors = require("@koa/cors")();
 
-const { getParsedDataStream, getBinnedData } = require("./data");
+const {
+  getFilteredDataStream,
+  getFormattedDataStream,
+  getGroupedData
+} = require("./data");
 
-router.get("/FI/:path.:type", async ctx => {
-  const { path, type } = ctx.params;
-  if (
-    ["confirmed", "recovered", "deaths"].indexOf(path) > -1 &&
-    ["json", "csv"].indexOf(type) > -1
-  ) {
-    const dataStream = await getParsedDataStream(path, type);
-    ctx.type = type;
-    ctx.body = dataStream;
+router.get("/FI/grouped.:type", async ctx => {
+  const { type } = ctx.params;
+
+  if (!(["json", "csv"].indexOf(type) > -1)) {
+    ctx.status = 404;
     return;
   }
-  ctx.status = 404;
+
+  const data = await getGroupedData(type);
+
+  ctx.type = type;
+  ctx.body = data;
 });
 
-router.get("/FI/binned/:path.:type", async ctx => {
-  const { path, type } = ctx.params;
-  if (
-    ["confirmed", "recovered", "deaths"].indexOf(path) > -1 &&
-    ["json"].indexOf(type) > -1
-  ) {
-    const dataStream = await getBinnedData(path);
-    ctx.type = type;
-    ctx.body = dataStream;
+router.get("/FI/all.:type", async ctx => {
+  const { type } = ctx.params;
+  const { fields = "" } = ctx.query;
+
+  if (!(["json", "csv"].indexOf(type) > -1)) {
+    ctx.status = 404;
     return;
   }
-  ctx.status = 404;
+
+  const dataStream = await getFilteredDataStream(null, fields.split(","));
+  const formattedStream = getFormattedDataStream(dataStream, type);
+
+  ctx.type = type;
+  ctx.body = formattedStream;
+});
+
+router.get("/FI/:datum.:type", async ctx => {
+  const { datum, type } = ctx.params;
+  const { fields = "" } = ctx.query;
+
+  if (
+    !(
+      ["confirmed", "recovered", "deaths"].indexOf(datum) > -1 &&
+      ["json", "csv"].indexOf(type) > -1
+    )
+  ) {
+    ctx.status = 404;
+    return;
+  }
+
+  const dataStream = await getFilteredDataStream(datum, fields.split(","));
+  const formattedStream = getFormattedDataStream(dataStream, type);
+
+  ctx.type = type;
+  ctx.body = formattedStream;
 });
 
 server

@@ -5,8 +5,9 @@ const Chain = require("stream-chain");
 const { parser: StreamJsonParser } = require("stream-json");
 const { pick: StreamJsonPicker } = require("stream-json/filters/Pick");
 const { stringer: StreamJsonStringer } = require("stream-json/Stringer");
+const { filter: StreamJsonFilter } = require("stream-json/filters/Filter");
 const { Collect } = require("stream-collect");
-const { Transform: CSVTransform } = require("json2csv");
+const { parse: csvParse, Transform: CSVTransform } = require("json2csv");
 
 const request = require("request");
 const dateFormat = require("dateformat");
@@ -14,9 +15,11 @@ const dateFormat = require("dateformat");
 const dataURI =
   "https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData";
 
-function getCacheFilepath() {
+const getCacheFilepath = () => {
   return `./cache/data-${dateFormat(new Date(), "yyyy-mm-dd-hh")}.dat`;
-}
+};
+
+const csvOptions = [{ withBOM: true }, { encoding: "utf-8" }];
 
 async function getRawDataStream() {
   if (!process.env.USE_CACHE) return request.get(dataURI);
@@ -35,30 +38,29 @@ async function getRawDataStream() {
   return fs.createReadStream(filename);
 }
 
-async function getParsedDataStream(path, type) {
-  const pipeline = [
-    StreamJsonParser(), // Parse json byte stream
-    StreamJsonPicker({ filter: path }), // Pick the parts we want
-    StreamJsonStringer() // Convert back to byte stream
-  ];
+async function getFilteredDataStream(datum = null, fields = null) {
+  const pipeline = [StreamJsonParser()];
 
-  if (type === "csv") {
-    pipeline.push(
-      new CSVTransform(
-        {
-          fields: [
-            "id",
-            "date",
-            "healthCareDistrict",
-            "infectionSourceCountry",
-            "infectionSource"
-          ],
-          withBOM: true
-        },
-        { encoding: "utf-8" }
-      )
+  if (datum) pipeline.push(StreamJsonPicker({ filter: datum }));
+
+  if (fields) {
+    const validFields = fields.filter(
+      f =>
+        [
+          "id",
+          "date",
+          "healthCareDistrict",
+          "infectionSourceCountry",
+          "infectionSource"
+        ].indexOf(f) > -1
     );
+    if (validFields) {
+      const fieldStr = `^.*(${validFields.join("|")})\\b`;
+      pipeline.push(StreamJsonFilter({ filter: new RegExp(fieldStr) }));
+    }
   }
+
+  pipeline.push(StreamJsonStringer());
 
   const chain = new Chain(pipeline);
 
@@ -67,22 +69,60 @@ async function getParsedDataStream(path, type) {
   return chain;
 }
 
-async function getBinnedData(path) {
-  const data = await (await getParsedDataStream(path, "json"))
+async function getGroupedData(type) {
+  const data = await (await getFilteredDataStream(null, ["date"]))
     .pipe(new Collect({ encoding: "utf-8" }))
     .collect()
-    .then(jsonStr => JSON.parse(jsonStr))
-    .then(data => data.map(d => new Date(d.date)));
+    .then(str => JSON.parse(str));
 
-  const ticks = d3
-    .scaleTime()
-    .domain(d3.extent(data))
-    .ticks(d3.timeDay.every(1));
+  const getKey = d => d.key;
+  const getDateStr = d => d.date.substring(0, 10);
+  const getLength = v => v.length;
+  const renameKeyAndSpreadValue = ({ key, value }) => ({ date: key, ...value });
+  const addDatum = datum => ({ key, value }) => ({ key, value, datum });
+  const transposeDatum = (acc, { datum, value }) => ({
+    ...acc,
+    [datum]: value
+  });
+  const rollupTransposeDatum = v => v.reduce(transposeDatum, {});
 
-  const hist = d3.histogram().thresholds(ticks)(data);
-  const result = hist.map(h => ({ x: h.x0, y: h.length }));
+  const groupByDate = d3
+    .nest()
+    .key(getDateStr)
+    .rollup(getLength);
+
+  const grouped = Object.keys(data).reduce(
+    (acc, datum) => [
+      ...acc,
+      ...groupByDate.entries(data[datum]).map(addDatum(datum))
+    ],
+    []
+  );
+
+  const result = d3
+    .nest()
+    .key(getKey)
+    .sortKeys(d3.ascending)
+    .rollup(rollupTransposeDatum)
+    .entries(grouped)
+    .map(renameKeyAndSpreadValue);
+
+  if (type === "csv") return csvParse(result, ...csvOptions);
 
   return result;
 }
 
-module.exports = { getRawDataStream, getParsedDataStream, getBinnedData };
+function getFormattedDataStream(stream, type) {
+  if (type === "csv") {
+    const csvTransform = new CSVTransform(...csvOptions);
+    return stream.pipe(csvTransform);
+  }
+  return stream;
+}
+
+module.exports = {
+  getRawDataStream,
+  getFormattedDataStream,
+  getFilteredDataStream,
+  getGroupedData
+};
