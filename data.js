@@ -22,7 +22,7 @@ const getCacheFilepath = () => {
 const csvOptions = [{ withBOM: true }, { encoding: "utf-8" }];
 
 async function getRawDataStream() {
-  if (!process.env.USE_CACHE) return request.get(dataURI);
+  if (process.env.NODE_ENV !== "development") return request.get(dataURI);
 
   const filename = getCacheFilepath();
 
