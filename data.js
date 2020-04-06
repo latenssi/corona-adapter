@@ -12,8 +12,11 @@ const { parse: csvParse, Transform: CSVTransform } = require("json2csv");
 const request = require("request");
 const dateFormat = require("dateformat");
 
-const dataURI =
+const dataURIv1 =
   "https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData";
+
+const dataURIv2 =
+  "https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData/v2";
 
 const getCacheFilepath = () => {
   return `./cache/data-${dateFormat(new Date(), "yyyy-mm-dd-HH")}.dat`;
@@ -22,14 +25,14 @@ const getCacheFilepath = () => {
 const csvOptions = [{ withBOM: true }, { encoding: "utf-8" }];
 
 async function getRawDataStream() {
-  if (process.env.NODE_ENV !== "development") return request.get(dataURI);
+  if (process.env.NODE_ENV !== "development") return request.get(dataURIv2);
 
   const filename = getCacheFilepath();
 
   if (!fs.existsSync(filename)) {
-    await new Promise(resolve =>
+    await new Promise((resolve) =>
       request
-        .get(dataURI)
+        .get(dataURIv2)
         .pipe(fs.createWriteStream(filename))
         .on("finish", resolve)
     );
@@ -45,13 +48,13 @@ async function getFilteredDataStream(datum = null, fields = null) {
 
   if (fields) {
     const validFields = fields.filter(
-      f =>
+      (f) =>
         [
           "id",
           "date",
           "healthCareDistrict",
           "infectionSourceCountry",
-          "infectionSource"
+          "infectionSource",
         ].indexOf(f) > -1
     );
     if (validFields) {
@@ -73,28 +76,25 @@ async function getGroupedData(type) {
   const data = await (await getFilteredDataStream(null, ["date"]))
     .pipe(new Collect({ encoding: "utf-8" }))
     .collect()
-    .then(str => JSON.parse(str));
+    .then((str) => JSON.parse(str));
 
-  const getKey = d => d.key;
-  const getDateStr = d => d.date.substring(0, 10);
-  const getLength = v => v.length;
+  const getKey = (d) => d.key;
+  const getDateStr = (d) => d.date.substring(0, 10);
+  const getLength = (v) => v.length;
   const renameKeyAndSpreadValue = ({ key, value }) => ({ date: key, ...value });
-  const addDatum = datum => ({ key, value }) => ({ key, value, datum });
+  const addDatum = (datum) => ({ key, value }) => ({ key, value, datum });
   const transposeDatum = (acc, { datum, value }) => ({
     ...acc,
-    [datum]: value
+    [datum]: value,
   });
-  const rollupTransposeDatum = v => v.reduce(transposeDatum, {});
+  const rollupTransposeDatum = (v) => v.reduce(transposeDatum, {});
 
-  const groupByDate = d3
-    .nest()
-    .key(getDateStr)
-    .rollup(getLength);
+  const groupByDate = d3.nest().key(getDateStr).rollup(getLength);
 
   const grouped = Object.keys(data).reduce(
     (acc, datum) => [
       ...acc,
-      ...groupByDate.entries(data[datum]).map(addDatum(datum))
+      ...groupByDate.entries(data[datum]).map(addDatum(datum)),
     ],
     []
   );
@@ -124,5 +124,5 @@ module.exports = {
   getRawDataStream,
   getFormattedDataStream,
   getFilteredDataStream,
-  getGroupedData
+  getGroupedData,
 };
