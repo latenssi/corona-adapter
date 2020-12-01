@@ -20,17 +20,17 @@
   "homepage": "https://github.com/latenssi/corona-adapter#readme",
   "dependencies": {
     "@koa/cors": "^3.1.0",
-    "d3": "^5.16.0",
-    "dateformat": "^3.0.3",
-    "json2csv": "^5.0.3",
+    "d3": "^6.2.0",
+    "dateformat": "^4.0.0",
+    "json2csv": "^5.0.5",
     "koa": "^2.13.0",
-    "koa-router": "^9.4.0",
+    "koa-router": "^10.0.0",
     "request": "^2.88.2",
     "stream-chain": "^2.2.3",
     "stream-collect": "^2.1.5",
     "stream-json": "^1.7.1"
   },
   "devDependencies": {
-    "nodemon": "^2.0.4"
+    "nodemon": "^2.0.6"
   }
 }

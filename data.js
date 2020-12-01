@@ -1,5 +1,4 @@
 const fs = require("fs");
-
 const d3 = require("d3");
 const Chain = require("stream-chain");
 const { parser: StreamJsonParser } = require("stream-json");
@@ -8,9 +7,9 @@ const { stringer: StreamJsonStringer } = require("stream-json/Stringer");
 const { filter: StreamJsonFilter } = require("stream-json/filters/Filter");
 const { Collect } = require("stream-collect");
 const { parse: csvParse, Transform: CSVTransform } = require("json2csv");
-
 const request = require("request");
 const dateFormat = require("dateformat");
+const { group } = require("console");
 
 const dataURIv1 =
   "https://w3qa5ydb4l.execute-api.eu-west-1.amazonaws.com/prod/finnishCoronaData";
@@ -78,37 +77,25 @@ async function getGroupedData(type) {
     .collect()
     .then((str) => JSON.parse(str));
 
-  const getKey = (d) => d.key;
   const getDateStr = (d) => d.date.substring(0, 10);
+  const getDatum = (d) => d.datum;
   const getLength = (v) => v.length;
-  const renameKeyAndSpreadValue = ({ key, value }) => ({ date: key, ...value });
-  const addDatum = (datum) => ({ key, value }) => ({ key, value, datum });
-  const transposeDatum = (acc, { datum, value }) => ({
-    ...acc,
-    [datum]: value,
-  });
-  const rollupTransposeDatum = (v) => v.reduce(transposeDatum, {});
 
-  const groupByDate = d3.nest().key(getDateStr).rollup(getLength);
+  // datums: [ 'confirmed', 'deaths', 'recovered' ]
+  // data: { confirmed: [...], deaths: [...], recovered: [...]}
 
-  const grouped = Object.keys(data).reduce(
-    (acc, datum) => [
-      ...acc,
-      ...groupByDate.entries(data[datum]).map(addDatum(datum)),
-    ],
+  // Transpose from { datum: [{ ...value },], } to [ { ...value, datum  }, ]
+  const transposed = Object.entries(data).reduce(
+    (acc, [datum, cases]) => [...acc, ...cases.map((c) => ({ ...c, datum }))],
     []
   );
 
   const result = d3
-    .nest()
-    .key(getKey)
-    .sortKeys(d3.ascending)
-    .rollup(rollupTransposeDatum)
-    .entries(grouped)
-    .map(renameKeyAndSpreadValue);
+    .rollups(transposed, getLength, getDateStr, getDatum)
+    .sort((a, b) => d3.ascending(a[0], b[0]))
+    .map(([date, values]) => ({ date, ...Object.fromEntries(values) }));
 
   if (type === "csv") return csvParse(result, ...csvOptions);
-
   return result;
 }
 
